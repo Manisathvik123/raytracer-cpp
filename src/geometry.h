@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 
 struct Vec3f {
 	float x, y, z;
@@ -11,5 +12,63 @@ struct Vec3f {
 		if (i == 0) return x;
 		if (i == 1) return y;
 		return z;
+	}
+
+	float operator*(const Vec3f &v) const
+	{
+		return x * v.x + y * v.y + z * v.z;
+	}
+
+	Vec3f operator-(const Vec3f &v) const
+	{
+		return Vec3f(x - v.x, y - v.y, z - v.z);
+	}
+	Vec3f operator+(const Vec3f &v) const
+	{
+		return Vec3f(x + v.x, y + v.y, z + v.z);
+	}
+
+	Vec3f operator*(float f) const
+	{
+		return Vec3f(x * f, y * f, z * f);
+	}
+};
+
+struct Ray
+{
+	Vec3f origin;
+	Vec3f direction;
+};
+
+struct Sphere
+{
+	Vec3f center;
+	float radius;
+
+	bool ray_intersect(const Ray &ray, float &t0) const
+	{
+		Vec3f L = center - ray.origin;
+
+		float tca = L * ray.direction;
+		float d2 = L * L - tca * tca;
+
+		if (d2 > radius * radius)
+		{
+			return false;
+		}
+
+		float thc = sqrtf(radius * radius - d2);
+		t0 = tca - thc;
+		float t1 = tca + thc;
+
+		if (t0 < 0)
+		{
+			t0 = t1;
+		}
+		if (t0 < 0)
+		{
+			return false;
+		}
+		return true;
 	}
 };
