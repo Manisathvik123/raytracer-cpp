@@ -32,6 +32,21 @@ struct Vec3f {
 	{
 		return Vec3f(x * f, y * f, z * f);
 	}
+
+	float norm() const
+	{
+		return std::sqrt(x * x + y * y + z * z);
+	}
+
+	Vec3f& normalize()
+	{
+		float n = norm();
+		x /= n;
+		y /= n;
+		z /= n;
+
+		return *this;
+	}
 };
 
 struct Ray
@@ -44,6 +59,7 @@ struct Sphere
 {
 	Vec3f center;
 	float radius;
+	Vec3f diffuse_color;
 
 	bool ray_intersect(const Ray &ray, float &t0) const
 	{
