@@ -49,6 +49,11 @@ struct Vec3f {
 	}
 };
 
+Vec3f reflect(const Vec3f &I, const Vec3f &N)
+{
+	return I - N * 2.f * (I * N);
+}
+
 struct Ray
 {
 	Vec3f origin;
@@ -60,6 +65,7 @@ struct Sphere
 	Vec3f center;
 	float radius;
 	Vec3f diffuse_color;
+	float specular_exponent;
 
 	bool ray_intersect(const Ray &ray, float &t0) const
 	{

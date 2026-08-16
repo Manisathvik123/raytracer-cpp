@@ -31,14 +31,16 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
     Vec3f N = (hit - hit_sphere->center).normalize();
 
     float diffuse_light_intensity = 0;
+    float specular_light_intensity = 0;
 
     for (const auto &light : lights)
     {
         Vec3f light_dir = (light.position - hit).normalize();
         diffuse_light_intensity += light.intensity * std::max(0.f, light_dir * N);
+        specular_light_intensity += powf(std::max(0.f, reflect(light_dir, N) * ray.direction), hit_sphere->specular_exponent) * light.intensity;
     }
 
-    return hit_sphere->diffuse_color * diffuse_light_intensity;
+    return hit_sphere->diffuse_color * diffuse_light_intensity + Vec3f(1., 1., 1.) * specular_light_intensity;
 }
 
 void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights)
@@ -85,24 +87,28 @@ int main()
     sphere1.center = Vec3f(-3, 0, -16);
     sphere1.radius = 2;
     sphere1.diffuse_color = Vec3f(0.4, 0.4, 0.3);
+    sphere1.specular_exponent = 50.0;
     spheres.push_back(sphere1);
 
     Sphere sphere2;
     sphere2.center = Vec3f(-1.0, -1.5, -12);
     sphere2.radius = 2;
     sphere2.diffuse_color = Vec3f(0.3, 0.1, 0.1);
+    sphere2.specular_exponent = 80.0;
     spheres.push_back(sphere2);
     
     Sphere sphere3;
     sphere3.center = Vec3f(-1.5, -0.5, -18);
     sphere3.radius = 3;
     sphere3.diffuse_color = Vec3f(0.7, 0.4, 0.3);
+    sphere3.specular_exponent = 67.0;
     spheres.push_back(sphere3);
 
     Sphere sphere4;
     sphere4.center = Vec3f(7, 5, -18);
     sphere4.radius = 4;
     sphere4.diffuse_color = Vec3f(0.3, 0.7, 0.1);
+    sphere4.specular_exponent = 69.0;
     spheres.push_back(sphere4);
 
     std::vector<Light> lights;
