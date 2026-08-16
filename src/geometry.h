@@ -88,3 +88,9 @@ struct Sphere
 		return true;
 	}
 };
+
+struct Light
+{
+	Vec3f position;
+	float intensity;
+};

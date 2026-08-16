@@ -6,10 +6,10 @@
 #include <cmath>
 #include "geometry.h"
 
-Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres)
+Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::vector<Light> &lights)
 {
     float spheres_dist = std::numeric_limits<float>::max();
-    Vec3f hit_color = Vec3f(0.2, 0.7, 0.8);
+    const Sphere *hit_sphere = nullptr;
 
     for (const auto &sphere : spheres)
     {
@@ -18,13 +18,30 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres)
         if (sphere.ray_intersect(ray, dist_i) && dist_i < spheres_dist)
         {
             spheres_dist = dist_i;
-            hit_color = sphere.diffuse_color;
+            hit_sphere = &sphere;
         }
     }
-    return hit_color;
+
+    if (!hit_sphere)
+    {
+        return Vec3f(0.2, 0.7, 0.8); // bg
+    }
+
+    Vec3f hit = ray.origin + ray.direction * spheres_dist;
+    Vec3f N = (hit - hit_sphere->center).normalize();
+
+    float diffuse_light_intensity = 0;
+
+    for (const auto &light : lights)
+    {
+        Vec3f light_dir = (light.position - hit).normalize();
+        diffuse_light_intensity += light.intensity * std::max(0.f, light_dir * N);
+    }
+
+    return hit_sphere->diffuse_color * diffuse_light_intensity;
 }
 
-void render(const std::vector<Sphere> &spheres)
+void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights)
 {
     const int width = 1024;
     const int height = 768;
@@ -42,7 +59,7 @@ void render(const std::vector<Sphere> &spheres)
             Ray ray;
             ray.origin = Vec3f(0, 0, 0);
             ray.direction = dir;
-            framebuffer[i + j * width] = cast_ray(ray, spheres);
+            framebuffer[i + j * width] = cast_ray(ray, spheres, lights);
         }
     }
 
@@ -88,7 +105,14 @@ int main()
     sphere4.diffuse_color = Vec3f(0.3, 0.7, 0.1);
     spheres.push_back(sphere4);
 
-    render(spheres);
+    std::vector<Light> lights;
+
+    Light l1;
+    l1.position = Vec3f(-20, 20, 20);
+    l1.intensity = 1.5;
+    lights.push_back(l1);
+
+    render(spheres, lights);
     
 
     return 0;
