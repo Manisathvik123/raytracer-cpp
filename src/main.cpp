@@ -6,18 +6,25 @@
 #include <cmath>
 #include "geometry.h"
 
-Vec3f cast_ray(const Ray &ray, const Sphere & sphere)
+Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres)
 {
-    float sphere_dist = std::numeric_limits<float>::max();
+    float spheres_dist = std::numeric_limits<float>::max();
+    Vec3f hit_color = Vec3f(0.2, 0.7, 0.8);
 
-    if (!sphere.ray_intersect(ray, sphere_dist))
+    for (const auto &sphere : spheres)
     {
-        return Vec3f(0.2, 0.7, 0.8); // bg color
+        float dist_i;
+
+        if (sphere.ray_intersect(ray, dist_i) && dist_i < spheres_dist)
+        {
+            spheres_dist = dist_i;
+            hit_color = sphere.diffuse_color;
+        }
     }
-    return Vec3f(0.4, 0.4, 0.3); // sphere color
+    return hit_color;
 }
 
-void render(const Sphere & sphere)
+void render(const std::vector<Sphere> &spheres)
 {
     const int width = 1024;
     const int height = 768;
@@ -35,7 +42,7 @@ void render(const Sphere & sphere)
             Ray ray;
             ray.origin = Vec3f(0, 0, 0);
             ray.direction = dir;
-            framebuffer[i + j * width] = cast_ray(ray, sphere);
+            framebuffer[i + j * width] = cast_ray(ray, spheres);
         }
     }
 
@@ -55,10 +62,33 @@ void render(const Sphere & sphere)
 
 int main()
 {
-    Sphere sphere;
-    sphere.center = Vec3f(-3, 0, -16);
-    sphere.radius = 2;
-    render(sphere);
+    std::vector<Sphere> spheres;
+
+    Sphere sphere1;
+    sphere1.center = Vec3f(-3, 0, -16);
+    sphere1.radius = 2;
+    sphere1.diffuse_color = Vec3f(0.4, 0.4, 0.3);
+    spheres.push_back(sphere1);
+
+    Sphere sphere2;
+    sphere2.center = Vec3f(-1.0, -1.5, -12);
+    sphere2.radius = 2;
+    sphere2.diffuse_color = Vec3f(0.3, 0.1, 0.1);
+    spheres.push_back(sphere2);
+    
+    Sphere sphere3;
+    sphere3.center = Vec3f(-1.5, -0.5, -18);
+    sphere3.radius = 3;
+    sphere3.diffuse_color = Vec3f(0.7, 0.4, 0.3);
+    spheres.push_back(sphere3);
+
+    Sphere sphere4;
+    sphere4.center = Vec3f(7, 5, -18);
+    sphere4.radius = 4;
+    sphere4.diffuse_color = Vec3f(0.3, 0.7, 0.1);
+    spheres.push_back(sphere4);
+
+    render(spheres);
     
 
     return 0;
