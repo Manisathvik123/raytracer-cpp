@@ -60,12 +60,19 @@ struct Ray
 	Vec3f direction;
 };
 
+
+struct Material
+{
+	Vec3f diffuse_color;
+	float specular_exponent;
+};
+
 struct Sphere
 {
 	Vec3f center;
 	float radius;
 	Vec3f diffuse_color;
-	float specular_exponent;
+	Material material;
 
 	bool ray_intersect(const Ray &ray, float &t0) const
 	{
