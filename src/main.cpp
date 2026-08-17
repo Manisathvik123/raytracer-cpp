@@ -36,6 +36,35 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
     Vec3f hit = ray.origin + ray.direction * spheres_dist;
     Vec3f N = (hit - hit_sphere->center).normalize();
 
+    float cosi = -(ray.direction * N);
+
+    float ri_from = 1.0f;
+    float ri_to = hit_sphere->material.refractive_index;
+
+    if (cosi < 0)
+    {
+        cosi = -cosi;
+        std::swap(ri_from, ri_to);
+        N = N * -1.f;
+    }
+
+    float ri_ratio = ri_from / ri_to;
+
+    float sin2_t = ri_ratio * ri_ratio * (1 - cosi * cosi);
+    Vec3f refract_color(0, 0, 0);
+    if (sin2_t <= 1.0f)
+    {
+        float cost = sqrtf(1.0f - sin2_t);
+
+        Vec3f refract_dir = ray.direction * ri_ratio + N * (ri_ratio * cosi - cost);
+
+        Ray refract_ray;
+        refract_ray.origin = hit - N * 1e-3f;
+        refract_ray.direction = refract_dir;
+
+        refract_color = cast_ray(refract_ray, spheres, lights, depth + 1);
+    }
+
     Vec3f reflect_dir = reflect(ray.direction, N).normalize();
 
     Ray reflect_ray;
@@ -79,8 +108,9 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
     Vec3f surface_color = hit_sphere->material.diffuse_color * diffuse_light_intensity + Vec3f(1., 1., 1.) * specular_light_intensity;
 
     float reflectivity = hit_sphere->material.reflectivity;
+    float transparency = hit_sphere->material.transparency;
 
-    Vec3f final_color = surface_color * (1.f - reflectivity) + reflect_color * reflectivity;
+    Vec3f final_color = surface_color * (1.f - reflectivity - transparency) + reflect_color * reflectivity + refract_color * transparency;
 
     return final_color;
 }
@@ -129,6 +159,8 @@ int main()
     m1.diffuse_color = Vec3f(0.4, 0.4, 0.3);
     m1.specular_exponent = 50.0;
     m1.reflectivity = 0.0;
+    m1.refractive_index = 1.0;
+    m1.transparency = 0.0f;
 
     Sphere sphere1;
     sphere1.center = Vec3f(-3, 0, -16);
@@ -140,6 +172,8 @@ int main()
     m2.diffuse_color = Vec3f(0.3, 0.1, 0.1);
     m2.specular_exponent = 80.0;
     m2.reflectivity = 0.2;
+    m2.refractive_index = 1.0;
+    m2.transparency = 0.0f;
 
     Sphere sphere2;
     sphere2.center = Vec3f(-1.0, -1.5, -12);
@@ -150,7 +184,9 @@ int main()
     Material m3;
     m3.diffuse_color = Vec3f(0.7, 0.4, 0.3);
     m3.specular_exponent = 67.0;
-    m3.reflectivity = 0.5;
+    m3.reflectivity = 0.2;
+    m3.refractive_index = 1.5;
+    m3.transparency = 0.8f;
     
     Sphere sphere3;
     sphere3.center = Vec3f(-1.5, -0.5, -18);
@@ -162,6 +198,8 @@ int main()
     m4.diffuse_color = Vec3f(0.3, 0.7, 0.1);
     m4.specular_exponent = 69.0;
     m4.reflectivity = 0.8;
+    m4.refractive_index = 1.0;
+    m4.transparency = 0.0f;
 
     Sphere sphere4;
     sphere4.center = Vec3f(7, 5, -18);

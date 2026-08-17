@@ -66,6 +66,8 @@ struct Material
 	Vec3f diffuse_color;
 	float specular_exponent;
 	float reflectivity;
+	float refractive_index;
+	float transparency;
 };
 
 struct Sphere
