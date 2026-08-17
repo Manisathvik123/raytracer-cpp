@@ -6,8 +6,14 @@
 #include <cmath>
 #include "geometry.h"
 
-Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::vector<Light> &lights)
+Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::vector<Light> &lights, int depth)
 {
+    const int max_depth = 4;
+
+    if (depth > max_depth)
+    {
+        return Vec3f(0.2, 0.7, 0.8);
+    }
     float spheres_dist = std::numeric_limits<float>::max();
     const Sphere *hit_sphere = nullptr;
 
@@ -29,6 +35,14 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
 
     Vec3f hit = ray.origin + ray.direction * spheres_dist;
     Vec3f N = (hit - hit_sphere->center).normalize();
+
+    Vec3f reflect_dir = reflect(ray.direction, N).normalize();
+
+    Ray reflect_ray;
+    reflect_ray.origin = hit + N * 1e-3f;
+    reflect_ray.direction = reflect_dir;
+
+    Vec3f reflect_color = cast_ray(reflect_ray, spheres, lights, depth + 1);
 
     float diffuse_light_intensity = 0;
     float specular_light_intensity = 0;
@@ -62,7 +76,13 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
         }
     }
 
-    return hit_sphere->material.diffuse_color * diffuse_light_intensity + Vec3f(1., 1., 1.) * specular_light_intensity;
+    Vec3f surface_color = hit_sphere->material.diffuse_color * diffuse_light_intensity + Vec3f(1., 1., 1.) * specular_light_intensity;
+
+    float reflectivity = hit_sphere->material.reflectivity;
+
+    Vec3f final_color = surface_color * (1.f - reflectivity) + reflect_color * reflectivity;
+
+    return final_color;
 }
 
 void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights)
@@ -83,7 +103,7 @@ void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights
             Ray ray;
             ray.origin = Vec3f(0, 0, 0);
             ray.direction = dir;
-            framebuffer[i + j * width] = cast_ray(ray, spheres, lights);
+            framebuffer[i + j * width] = cast_ray(ray, spheres, lights, 0);
         }
     }
 
@@ -108,6 +128,7 @@ int main()
     Material m1;
     m1.diffuse_color = Vec3f(0.4, 0.4, 0.3);
     m1.specular_exponent = 50.0;
+    m1.reflectivity = 0.0;
 
     Sphere sphere1;
     sphere1.center = Vec3f(-3, 0, -16);
@@ -118,6 +139,7 @@ int main()
     Material m2;
     m2.diffuse_color = Vec3f(0.3, 0.1, 0.1);
     m2.specular_exponent = 80.0;
+    m2.reflectivity = 0.2;
 
     Sphere sphere2;
     sphere2.center = Vec3f(-1.0, -1.5, -12);
@@ -128,6 +150,7 @@ int main()
     Material m3;
     m3.diffuse_color = Vec3f(0.7, 0.4, 0.3);
     m3.specular_exponent = 67.0;
+    m3.reflectivity = 0.5;
     
     Sphere sphere3;
     sphere3.center = Vec3f(-1.5, -0.5, -18);
@@ -138,6 +161,7 @@ int main()
     Material m4;
     m4.diffuse_color = Vec3f(0.3, 0.7, 0.1);
     m4.specular_exponent = 69.0;
+    m4.reflectivity = 0.8;
 
     Sphere sphere4;
     sphere4.center = Vec3f(7, 5, -18);
