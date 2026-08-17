@@ -35,9 +35,31 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
 
     for (const auto &light : lights)
     {
-        Vec3f light_dir = (light.position - hit).normalize();
-        diffuse_light_intensity += light.intensity * std::max(0.f, light_dir * N);
-        specular_light_intensity += powf(std::max(0.f, reflect(light_dir, N) * ray.direction), hit_sphere->material.specular_exponent) * light.intensity;
+        Vec3f light_vec = light.position - hit;
+        Vec3f light_dir = light_vec.normalize();
+        float light_distance = light_vec.norm();
+
+        Ray shadow_ray;
+        shadow_ray.origin = hit + N * 1e-3f;
+        shadow_ray.direction = light_dir;
+        
+        bool in_shadow = false;
+
+        for (const auto &sphere : spheres)
+        {
+            float shadow_dist;
+
+            if (sphere.ray_intersect(shadow_ray, shadow_dist) && shadow_dist < light_distance)
+            {
+                in_shadow = true;
+                break;
+            }
+        }
+        if (!in_shadow)
+        {
+            diffuse_light_intensity += light.intensity * std::max(0.f, light_dir * N);
+            specular_light_intensity += powf(std::max(0.f, reflect(light_dir, N) * ray.direction), hit_sphere->material.specular_exponent) * light.intensity;
+        }
     }
 
     return hit_sphere->material.diffuse_color * diffuse_light_intensity + Vec3f(1., 1., 1.) * specular_light_intensity;
