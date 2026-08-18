@@ -123,6 +123,32 @@ struct Sphere
 	}
 };
 
+struct Plane
+{
+	Vec3f point;
+	Vec3f normal;
+	Material material;
+
+	bool ray_intersect(const Ray &ray, float &dist) const
+	{
+		float denominator = normal * ray.direction;
+
+		if (fabsf(denominator) < 1e-6f)
+		{
+			return false;
+		}
+
+		float t = ((point - ray.origin) * normal) / denominator;
+
+		if (t < 0)
+		{
+			return false;
+		}
+		dist = t;
+		return true;
+	}
+};
+
 struct Light
 {
 	Vec3f position;

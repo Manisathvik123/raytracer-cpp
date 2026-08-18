@@ -6,7 +6,7 @@
 #include <cmath>
 #include "geometry.h"
 
-Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::vector<Light> &lights, int depth)
+Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const Plane &ground, const std::vector<Light> &lights, int depth)
 {
     const int max_depth = 4;
 
@@ -14,32 +14,68 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
     {
         return Vec3f(0.2, 0.7, 0.8);
     }
-    float spheres_dist = std::numeric_limits<float>::max();
+    float closest_dist = std::numeric_limits<float>::max();
     const Sphere *hit_sphere = nullptr;
+    const Plane *hit_plane = nullptr;
 
     for (const auto &sphere : spheres)
     {
         float dist_i;
 
-        if (sphere.ray_intersect(ray, dist_i) && dist_i < spheres_dist)
+        if (sphere.ray_intersect(ray, dist_i) && dist_i < closest_dist)
         {
-            spheres_dist = dist_i;
+            closest_dist = dist_i;
             hit_sphere = &sphere;
         }
     }
 
-    if (!hit_sphere)
+    float plane_dist;
+
+    if (ground.ray_intersect(ray, plane_dist) && plane_dist < closest_dist)
     {
-        return Vec3f(0.2, 0.7, 0.8); // bg
+        closest_dist = plane_dist;
+        hit_plane = &ground;
     }
 
-    Vec3f hit = ray.origin + ray.direction * spheres_dist;
-    Vec3f N = (hit - hit_sphere->center).normalize();
+    if (!hit_sphere && !hit_plane)
+    {
+        float sky_t = 0.5f * (ray.direction.y + 1.0f);
+
+        Vec3f horizion_color(0.8, 0.9, 1.0);
+        Vec3f sky_color(0.2, 0.5, 1.0);
+
+        Vec3f sky_color_final = horizion_color * (1.0f - sky_t) + sky_color * sky_t;
+
+        return sky_color_final; // bg
+    }
+
+    Vec3f hit = ray.origin + ray.direction * closest_dist;
+    Vec3f N;
+
+    if (hit_sphere)
+    {
+        N = (hit - hit_sphere->center).normalize();
+    }
+    else
+    {
+        N = ground.normal;
+    }
+
+    const Material *hit_material;
+
+    if (hit_sphere)
+    {
+        hit_material = &hit_sphere->material;
+    }
+    else
+    {
+        hit_material = &ground.material;
+    }
 
     float cosi = -(ray.direction * N);
 
     float ri_from = 1.0f;
-    float ri_to = hit_sphere->material.refractive_index;
+    float ri_to = hit_material->refractive_index;
 
     if (cosi < 0)
     {
@@ -62,7 +98,7 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
         refract_ray.origin = hit - N * 1e-3f;
         refract_ray.direction = refract_dir;
 
-        refract_color = cast_ray(refract_ray, spheres, lights, depth + 1);
+        refract_color = cast_ray(refract_ray, spheres, ground, lights, depth + 1);
     }
 
     Vec3f reflect_dir = reflect(ray.direction, N).normalize();
@@ -71,7 +107,7 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
     reflect_ray.origin = hit + N * 1e-3f;
     reflect_ray.direction = reflect_dir;
 
-    Vec3f reflect_color = cast_ray(reflect_ray, spheres, lights, depth + 1);
+    Vec3f reflect_color = cast_ray(reflect_ray, spheres, ground, lights, depth + 1);
 
     float diffuse_light_intensity = 0;
     float specular_light_intensity = 0;
@@ -98,24 +134,31 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const std::ve
                 break;
             }
         }
+
+        float ground_shadow_dist;
+
+        if (ground.ray_intersect(shadow_ray, ground_shadow_dist) && ground_shadow_dist > 1e-3f && ground_shadow_dist < light_distance)
+        {
+            in_shadow = true;
+        }
         if (!in_shadow)
         {
             diffuse_light_intensity += light.intensity * std::max(0.f, light_dir * N);
-            specular_light_intensity += powf(std::max(0.f, reflect(light_dir, N) * ray.direction), hit_sphere->material.specular_exponent) * light.intensity;
+            specular_light_intensity += powf(std::max(0.f, reflect(light_dir, N) * ray.direction), hit_material->specular_exponent) * light.intensity;
         }
     }
 
-    Vec3f surface_color = hit_sphere->material.diffuse_color * diffuse_light_intensity + Vec3f(1., 1., 1.) * specular_light_intensity;
+    Vec3f surface_color = hit_material->diffuse_color * diffuse_light_intensity + Vec3f(1., 1., 1.) * specular_light_intensity;
 
-    float reflectivity = hit_sphere->material.reflectivity;
-    float transparency = hit_sphere->material.transparency;
+    float reflectivity = hit_material->reflectivity;
+    float transparency = hit_material->transparency;
 
     Vec3f final_color = surface_color * (1.f - reflectivity - transparency) + reflect_color * reflectivity + refract_color * transparency;
 
     return final_color;
 }
 
-void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights)
+void render(const std::vector<Sphere> &spheres, const Plane &ground, const std::vector<Light> &lights)
 {
     const int width = 1024;
     const int height = 768;
@@ -133,7 +176,7 @@ void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights
             Ray ray;
             ray.origin = Vec3f(0, 0, 0);
             ray.direction = dir;
-            framebuffer[i + j * width] = cast_ray(ray, spheres, lights, 0);
+            framebuffer[i + j * width] = cast_ray(ray, spheres, ground, lights, 0);
         }
     }
 
@@ -163,7 +206,7 @@ int main()
     sphere1.material = m1;
     spheres.push_back(sphere1);
 
-    Material m2(Vec3f(0.3, 0.1, 0.1), 80.0f, 0.2f, 1.0f, 0.0f);
+    Material m2(Vec3f(0.3, 0.1, 0.1), 80.0f, 0.5f, 1.0f, 0.0f);
 
     Sphere sphere2;
     sphere2.center = Vec3f(-1.0, -1.5, -12);
@@ -171,7 +214,7 @@ int main()
     sphere2.material = m2;
     spheres.push_back(sphere2);
 
-    Material m3(Vec3f(0.7, 0.4, 0.3), 67.0f, 0.2f, 1.5f, 0.8f);
+    Material m3(Vec3f(0.7, 0.15, 0.1), 67.0f, 0.2f, 1.0f, 0.0f);
     
     Sphere sphere3;
     sphere3.center = Vec3f(-1.5, -0.5, -18);
@@ -179,13 +222,18 @@ int main()
     sphere3.material = m3;
     spheres.push_back(sphere3);
 
-    Material m4(Vec3f(0.3, 0.7, 0.1), 69.0f, 0.8f, 1.0f, 0.0f);
+    Material m4(Vec3f(0.7, 0.85, 0.95), 69.0f, 0.2f, 1.5f, 0.8f);
 
     Sphere sphere4;
     sphere4.center = Vec3f(7, 5, -18);
     sphere4.radius = 4;
     sphere4.material = m4;
     spheres.push_back(sphere4);
+
+    Plane ground;
+    ground.point = Vec3f(0, -3.5f, 0);
+    ground.normal = Vec3f(0, 1, 0);
+    ground.material = Material(Vec3f(0.35f, 0.35f, 0.35f), 20.0f, 0.1f, 1.0f, 0.0f);
 
     std::vector<Light> lights;
 
@@ -194,7 +242,7 @@ int main()
     l1.intensity = 1.5;
     lights.push_back(l1);
 
-    render(spheres, lights);
+    render(spheres, ground, lights);
     
 
     return 0;
