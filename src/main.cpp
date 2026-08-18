@@ -4,9 +4,20 @@
 #include <algorithm>
 #include <limits>
 #include <cmath>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include "geometry.h"
 
-Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const Plane &ground, const Triangle &triangle, const std::vector<Light> &lights, int depth)
+struct EnvironmentMap
+{
+    unsigned char *data;
+    int width;
+    int height;
+};
+
+Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const Plane &ground, const Triangle &triangle, const std::vector<Light> &lights, const EnvironmentMap &env, int depth)
 {
     const int max_depth = 4;
 
@@ -48,14 +59,20 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const Plane &
 
     if (!hit_sphere && !hit_plane && !hit_triangle)
     {
-        float sky_t = 0.5f * (ray.direction.y + 1.0f);
+        float u = atan2f(ray.direction.z, ray.direction.x) / (2.0f * M_PI) + 0.5f;
+        float v = 0.5 - asinf(ray.direction.y) / M_PI;
 
-        Vec3f horizion_color(0.8, 0.9, 1.0);
-        Vec3f sky_color(0.2, 0.5, 1.0);
+        u = u - floorf(u);
+        v = std::max(0.0f, std::min(1.0f, v));
 
-        Vec3f sky_color_final = horizion_color * (1.0f - sky_t) + sky_color * sky_t;
+        int px = static_cast<int>(u * (env.width - 1));
+        int py = static_cast<int>(v * (env.height - 1));
 
-        return sky_color_final; // bg
+        int idx = (py * env.width + px) * 3;
+
+        Vec3f environment_color(env.data[idx] / 255.0f, env.data[idx + 1] / 255.0f, env.data[idx + 2] / 255.0f);
+
+        return environment_color;
     }
 
     Vec3f hit = ray.origin + ray.direction * closest_dist;
@@ -115,7 +132,7 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const Plane &
         refract_ray.origin = hit - N * 1e-3f;
         refract_ray.direction = refract_dir;
 
-        refract_color = cast_ray(refract_ray, spheres, ground, triangle, lights, depth + 1);
+        refract_color = cast_ray(refract_ray, spheres, ground, triangle, lights, env, depth + 1);
     }
 
     Vec3f reflect_dir = reflect(ray.direction, N).normalize();
@@ -124,7 +141,7 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const Plane &
     reflect_ray.origin = hit + N * 1e-3f;
     reflect_ray.direction = reflect_dir;
 
-    Vec3f reflect_color = cast_ray(reflect_ray, spheres, ground, triangle, lights, depth + 1);
+    Vec3f reflect_color = cast_ray(reflect_ray, spheres, ground, triangle, lights, env, depth + 1);
 
     float diffuse_light_intensity = 0;
     float specular_light_intensity = 0;
@@ -184,7 +201,7 @@ Vec3f cast_ray(const Ray &ray, const std::vector<Sphere> &spheres, const Plane &
     return final_color;
 }
 
-void render(const std::vector<Sphere> &spheres, const Plane &ground, const Triangle &triangle, const std::vector<Light> &lights)
+void render(const std::vector<Sphere> &spheres, const Plane &ground, const Triangle &triangle, const std::vector<Light> &lights, const EnvironmentMap &env)
 {
     const int width = 1024;
     const int height = 768;
@@ -202,7 +219,7 @@ void render(const std::vector<Sphere> &spheres, const Plane &ground, const Trian
             Ray ray;
             ray.origin = Vec3f(0, 0, 0);
             ray.direction = dir;
-            framebuffer[i + j * width] = cast_ray(ray, spheres, ground, triangle, lights, 0);
+            framebuffer[i + j * width] = cast_ray(ray, spheres, ground, triangle, lights, env, 0);
         }
     }
 
@@ -222,29 +239,49 @@ void render(const std::vector<Sphere> &spheres, const Plane &ground, const Trian
 
 int main()
 {
+
+    int env_width;
+    int env_height;
+    int env_channels;
+
+    unsigned char *env_data = stbi_load("image.jpg", &env_width, &env_height, &env_channels, 3);
+
+    if (!env_data)
+    {
+        std::cerr << "Failed to load environment map\n";
+        return 1;
+    }
+
+    std::cout << "Environment loaded: " << env_width << "x" << env_height << "\n";
+
+    EnvironmentMap env;
+    env.data = env_data;
+    env.width = env_width;
+    env.height = env_height;
+
     std::vector<Sphere> spheres;
 
     Material m1(Vec3f(0.4, 0.4, 0.3), 50.0f, 0.0f, 1.0f, 0.0f);
 
     Sphere sphere1;
-    sphere1.center = Vec3f(-4.0f, -1.0f, -15.0f);
-    sphere1.radius = 2.0f;
+    sphere1.center = Vec3f(-4.2f, -1.3f, -15.0f);
+    sphere1.radius = 2.2f;
     sphere1.material = m1;
     spheres.push_back(sphere1);
 
     Material m2(Vec3f(0.3, 0.1, 0.1), 80.0f, 0.5f, 1.0f, 0.0f);
 
     Sphere sphere2;
-    sphere2.center = Vec3f(-1.0f, -1.5f, -12.0f);
-    sphere2.radius = 2.0f;
+    sphere2.center = Vec3f(-1.0f, -1.2f, -12.0f);
+    sphere2.radius = 2.3f;
     sphere2.material = m2;
     spheres.push_back(sphere2);
 
     Material m3(Vec3f(0.7, 0.15, 0.1), 67.0f, 0.2f, 1.0f, 0.0f);
     
     Sphere sphere3;
-    sphere3.center = Vec3f(2.0f, -1.0f, -16.0f);
-    sphere3.radius = 2.5f;
+    sphere3.center = Vec3f(2.5f, -0.8f, -18.0f);
+    sphere3.radius = 2.7f;
     sphere3.material = m3;
     spheres.push_back(sphere3);
 
@@ -267,11 +304,11 @@ int main()
     std::vector<Light> lights;
 
     Light l1;
-    l1.position = Vec3f(-20, 20, 20);
+    l1.position = Vec3f(-10, 15, 10);
     l1.intensity = 1.5;
     lights.push_back(l1);
 
-    render(spheres, ground, triangle1, lights);
+    render(spheres, ground, triangle1, lights, env);
     
 
     return 0;
