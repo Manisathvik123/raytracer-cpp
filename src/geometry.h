@@ -68,6 +68,24 @@ struct Material
 	float reflectivity;
 	float refractive_index;
 	float transparency;
+
+	Material()
+	{
+    	diffuse_color = Vec3f(0, 0, 0);
+    	specular_exponent = 0.0f;
+    	reflectivity = 0.0f;
+    	refractive_index = 1.0f;
+    	transparency = 0.0f;
+	}
+
+	Material(Vec3f color, float specular, float reflect, float refractive, float transparent)
+	{
+		diffuse_color = color;
+		specular_exponent = specular;
+		reflectivity = reflect;
+		refractive_index = refractive;
+		transparency = transparent;
+	}
 };
 
 struct Sphere
