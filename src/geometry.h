@@ -33,6 +33,11 @@ struct Vec3f {
 		return Vec3f(x * f, y * f, z * f);
 	}
 
+	Vec3f operator^(const Vec3f &v) const
+	{
+		return Vec3f(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
+	}
+
 	float norm() const
 	{
 		return std::sqrt(x * x + y * y + z * z);
@@ -145,6 +150,68 @@ struct Plane
 			return false;
 		}
 		dist = t;
+		return true;
+	}
+};
+
+struct Triangle
+{
+	Vec3f v0;
+	Vec3f v1;
+	Vec3f v2;
+	Material material;
+
+	Triangle(Vec3f vertex0, Vec3f vertex1, Vec3f vertex2, Material mat) 
+	{
+		v0 = vertex0;
+		v1 = vertex1;
+		v2 = vertex2;
+
+		material = mat;
+
+	}
+
+	bool ray_intersect(const Ray &ray, float &dist) const
+	{
+		float EPSILON = 1e-6f;
+
+		Vec3f edge1 = v1 - v0;
+		Vec3f edge2 = v2 - v0;
+
+		Vec3f h = ray.direction ^ edge2;
+		float a = edge1 * h;
+
+		if (fabsf(a) < EPSILON)
+		{
+			return false;
+		}
+
+		float f = 1.0f / a;
+		Vec3f s = ray.origin - v0;
+		float u = f * (s * h);
+
+		if (u < 0.0f || u > 1.0f)
+		{
+			return false;
+		}
+
+		Vec3f q = s ^ edge1;
+		float v = f * (ray.direction * q);
+
+		if (v < 0.0f || u + v > 1.0f)
+		{
+			return false;
+		}
+
+		float t = f * (edge2 * q);
+
+		if (t < EPSILON)
+		{
+			return false;
+		}
+		dist = t;
+		
+
 		return true;
 	}
 };
