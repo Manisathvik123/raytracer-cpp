@@ -5,7 +5,7 @@ ssloy's TinyRayTracer and experimenting with the concepts on my own.
 
 ## Final Render
 
-![Final Render](renders/final_render.jpg)
+![Final Render](renders/final_render.png)
 
 ## What it does
 
